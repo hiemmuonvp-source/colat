@@ -1,0 +1,91 @@
+name: Build APK
+on:
+  push:
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tao project Android
+        run: |
+          mkdir -p app/src/main/assets app/src/main/java/com/colat/pro
+          cp co-lat-android.html app/src/main/assets/index.html
+          cat > settings.gradle <<'EOT'
+          pluginManagement {
+              repositories { google(); mavenCentral(); gradlePluginPortal() }
+          }
+          dependencyResolutionManagement {
+              repositories { google(); mavenCentral() }
+          }
+          rootProject.name = "CoLatPro"
+          include ':app'
+          EOT
+          cat > build.gradle <<'EOT'
+          plugins { id 'com.android.application' version '8.5.2' apply false }
+          EOT
+          cat > app/build.gradle <<'EOT'
+          plugins { id 'com.android.application' }
+          android {
+              namespace 'com.colat.pro'
+              compileSdk 34
+              defaultConfig {
+                  applicationId 'com.colat.pro'
+                  minSdk 24
+                  targetSdk 34
+                  versionCode 1
+                  versionName '1.0'
+              }
+          }
+          EOT
+          cat > app/src/main/AndroidManifest.xml <<'EOT'
+          <?xml version="1.0" encoding="utf-8"?>
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <application android:label="Cờ lật Pro" android:theme="@android:style/Theme.Material.Light.NoActionBar">
+                  <activity android:name=".MainActivity" android:exported="true"
+                      android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN" />
+                          <category android:name="android.intent.category.LAUNCHER" />
+                      </intent-filter>
+                  </activity>
+              </application>
+          </manifest>
+          EOT
+          cat > app/src/main/java/com/colat/pro/MainActivity.java <<'EOT'
+          package com.colat.pro;
+          import android.app.Activity;
+          import android.graphics.Color;
+          import android.os.Bundle;
+          import android.webkit.WebSettings;
+          import android.webkit.WebView;
+          import android.webkit.WebViewClient;
+          public class MainActivity extends Activity {
+              private WebView web;
+              @Override protected void onCreate(Bundle b) {
+                  super.onCreate(b);
+                  web = new WebView(this);
+                  web.setBackgroundColor(Color.parseColor("#121a1b"));
+                  WebSettings s = web.getSettings();
+                  s.setJavaScriptEnabled(true);
+                  s.setDomStorageEnabled(true);
+                  web.setWebViewClient(new WebViewClient());
+                  setContentView(web);
+                  web.loadUrl("file:///android_asset/index.html");
+              }
+              @Override public void onBackPressed() { super.onBackPressed(); }
+              @Override protected void onDestroy() { if (web != null) web.destroy(); super.onDestroy(); }
+          }
+          EOT
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: 8.9
+      - run: gradle assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: co-lat-pro-apk
+          path: app/build/outputs/apk/debug/*.apk
